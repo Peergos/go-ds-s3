@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -123,11 +124,19 @@ func (s *S3Bucket) Has(k ds.Key) (exists bool, err error) {
 }
 
 func (s *S3Bucket) GetSize(k ds.Key) (size int, err error) {
+	return getSize(k, 20, 100)
+}
+
+func (s *S3Bucket) getSize(k ds.Key, retries int, sleepMillis int) (size int, err error) {
 	resp, err := s.S3.HeadObject(&s3.HeadObjectInput{
 		Bucket: aws.String(s.Bucket),
 		Key:    aws.String(s.s3Path(k.String())),
 	})
 	if err != nil {
+		if s3Err, ok := err.(awserr.Error); ok && s3Err.Code() == "ServiceUnavailable" {
+			time.Sleep(sleepMillis * time.Millisecond)
+			return getSize(k, retries-1, sleepMillis*2)
+		}
 		if s3Err, ok := err.(awserr.Error); ok && s3Err.Code() == "NotFound" {
 			return -1, ds.ErrNotFound
 		}
