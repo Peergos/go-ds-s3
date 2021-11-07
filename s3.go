@@ -143,7 +143,7 @@ func (s *S3Bucket) Has(k ds.Key) (exists bool, err error) {
 }
 
 func (s *S3Bucket) GetSize(k ds.Key) (size int, err error) {
-	return getSize(k, 20, 100)
+	return s.getSize(k, 20, 100)
 }
 
 func (s *S3Bucket) getSize(k ds.Key, retries int, sleepMillis int) (size int, err error) {
@@ -153,8 +153,8 @@ func (s *S3Bucket) getSize(k ds.Key, retries int, sleepMillis int) (size int, er
 	})
 	if err != nil {
 		if s3Err, ok := err.(awserr.Error); ok && s3Err.Code() == "ServiceUnavailable" {
-			time.Sleep(sleepMillis * time.Millisecond)
-			return getSize(k, retries-1, sleepMillis*2)
+			time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
+			return s.getSize(k, retries-1, sleepMillis*2)
 		}
 		if s3Err, ok := err.(awserr.Error); ok && s3Err.Code() == "NotFound" {
 			return -1, ds.ErrNotFound
