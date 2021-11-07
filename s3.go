@@ -153,6 +153,9 @@ func (s *S3Bucket) getSize(k ds.Key, retries int, sleepMillis int) (size int, er
 	})
 	if err != nil {
 		if s3Err, ok := err.(awserr.Error); ok && s3Err.Code() == "ServiceUnavailable" {
+			if retries == 0 {
+				return -1, err
+			}
 			time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
 			return s.getSize(k, retries-1, sleepMillis*2)
 		}
