@@ -18,6 +18,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+        "github.com/prometheus/client_golang/prometheus"
+        "github.com/prometheus/client_golang/prometheus/promauto"
 	ds "github.com/ipfs/go-datastore"
 	dsq "github.com/ipfs/go-datastore/query"
 )
@@ -36,6 +38,17 @@ const (
 	// credsRefreshWindow, subtracted from the endpointcred's expiration time, is the
 	// earliest time the endpoint creds can be refreshed.
 	credsRefreshWindow = 2 * time.Minute
+)
+
+var (
+        blockHeads = promauto.NewCounter(prometheus.CounterOpts{
+                Name: "ipfs_block_heads_total",
+                Help: "The total number of S3 block head requests",
+        })
+        blockGets = promauto.NewCounter(prometheus.CounterOpts{
+                Name: "ipfs_block_gets_total",
+                Help: "The total number of S3 block get requests",
+        })
 )
 
 type S3Bucket struct {
@@ -120,6 +133,7 @@ func (s *S3Bucket) Get(k ds.Key) ([]byte, error) {
 		Bucket: aws.String(s.Bucket),
 		Key:    aws.String(s.s3Path(k.String())),
 	})
+        blockGets.Inc()
 	if err != nil {
 		if isNotFound(err) {
 			return nil, ds.ErrNotFound
@@ -151,6 +165,7 @@ func (s *S3Bucket) getSize(k ds.Key, retries int, sleepMillis int) (size int, er
 		Bucket: aws.String(s.Bucket),
 		Key:    aws.String(s.s3Path(k.String())),
 	})
+        blockHeads.Inc()
 	if err != nil {
 		if s3Err, ok := err.(awserr.Error); ok && s3Err.Code() == "ServiceUnavailable" {
 			if retries == 0 {
